@@ -228,7 +228,7 @@ void findBall() {
 			}
 			
 			uchar horv = atof(line.c_str());
-			hvs[j%(1920*2)][j/(1920*2)][j%2] = horv;
+			hvs[j%(1920*2) / 2 * 2][j/(1920*2)][j%2] = horv;
 
 			lk = k;
 		}
@@ -276,6 +276,25 @@ void findBall() {
 	cout << duration << endl << endl;
 
 	f.close();
+}
+
+Mat seeNoise(Mat frame) {
+	Mat hsv;
+	cvtColor(frame, hsv, CV_BGR2HSV);
+	Mat copy = frame.clone();
+
+	for (int y = 0; y < frame.rows; y++) {
+		for (int x = 0; x < frame.cols; x++) {
+			Vec3b pixel = hsv.at<Vec3b>(y, x);
+			if (findBall(pixel)) {
+				copy.at<Vec3b>(y, x).val[0] = 255;
+				copy.at<Vec3b>(y, x).val[1] = 255;
+				copy.at<Vec3b>(y, x).val[2] = 0;
+			}
+		}
+	}
+
+	return copy;
 }
 
 //int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
