@@ -30,7 +30,6 @@ void curveFit(vector <double> & Xs, vector <double> & Ys, vector <double> & Zs, 
 void threeUnknownLinear(double constants[3][4], double & x, double & y, double & z);
 double addOffset(double z1, double t1, double z2, double t2);
 void getSpeed(vector <double> & Xs, vector <double> & Ys, vector <double> & Zs, vector <double> & speeds);
-
 void findLongest(vector<int> & xs, vector<int> & ys, int & x1, int & y1, int & x2, int & y2);
 void findShortest(int x, int y, vector<int> & xs, vector<int> & ys, int & x2, int & y2);
 void findLongest(int x, int y, vector<int> & xs, vector<int> & ys, int & x2, int & y2);
@@ -38,245 +37,6 @@ int dis(int x1, int y1, int x2, int y2);
 
 bool recording = false;
 
-// debuggin method
-
-void findBall(uchar hvs[][1080][2] , vector<int> & xs, vector<int> & ys, vector<double> & ds) {
-
-	vector<int> edgeXs = {};
-	vector<int> edgeYs = {};
-	int startX = 0;
-	int startY = 0;
-	int endX = 0;
-	int endY = 0;
-	int cenX = 0;
-	int cenY = 0;
-
-	for (int x = 0; x < 1920; x++) {
-
-		bool startFlag = false;
-		bool endFlag = false;
-		int ballCount = 0;
-		int endCount = 0;
-
-
-		for (int y = 0; y < 1080; y++) {
-
-			if (!startFlag) {
-				if (findBall(hvs[x][y][0], hvs[x][y][1])) {
-					ballCount++;
-				}
-				else {
-					ballCount = 0;
-				}
-			}
-			else if (!endFlag) {
-				if (!findBall(hvs[x][y][0], hvs[x][y][1])) {
-					endCount++;
-				}
-				else {
-					endCount = 0;
-				}
-			}
-
-			if (!startFlag && ballCount > 10) {
-				startFlag = true;
-				startY = y - ballCount;
-				edgeYs.push_back(startY);
-				edgeXs.push_back(x);
-			}
-
-			else if (!endFlag && endCount > 10) {
-				endFlag = true;
-				endY = y - endCount;
-				edgeYs.push_back(endY);
-				edgeXs.push_back(x);
-			}
-
-			else if (endFlag) {
-				break;
-			}
-
-		}
-	}
-
-
-	for (int y = 0; y < 1080; y++) {
-
-		bool startFlag = false;
-		bool endFlag = false;
-		int ballCount = 0;
-		int endCount = 0;
-
-		for (int x = 0; x < 1920; x++) {
-
-
-			if (!startFlag) {
-				if (findBall(hvs[x][y][0], hvs[x][y][1])) {
-					ballCount++;
-				}
-				else {
-					ballCount = 0;
-				}
-			}
-			else if (!endFlag) {
-				if (!findBall(hvs[x][y][0], hvs[x][y][1])) {
-					endCount++;
-				}
-				else {
-					endCount = 0;
-				}
-			}
-
-			if (!startFlag && ballCount > 10) {
-				startFlag = true;
-				startX = x - ballCount;
-				edgeXs.push_back(startX);
-				edgeYs.push_back(y);
-			}
-
-			else if (!endFlag && endCount > 10) {
-				endFlag = true;
-				endX = x - endCount;
-				edgeXs.push_back(endX);
-				edgeYs.push_back(y);
-			}
-
-			else if (endFlag) {
-				break;
-			}
-
-		}
-	}
-
-	int e = edgeYs.size();
-
-	double aX = 0;
-	double aY = 0;
-	for (int i = 0; i < e; i++) {
-		aX += edgeXs.at(i);
-		aY += edgeYs.at(i);
-	}
-	aX /= e;
-	aY /= e;
-
-	vector<int> tempEdgeXs = edgeXs;
-	vector<int> tempEdgeYs = edgeYs;
-
-	double aD = 0;
-	for (int i = 0; i < e; i++) {
-		aD += dis(edgeXs.at(i), edgeYs.at(i), aX, aY);
-	}
-	aD /= e;
-
-	vector<int> noiseCancelledEdgeXs = {};
-	vector<int> noiseCancelledEdgeYs = {};
-	for (int i = 0; i < e; i++) {
-		int x = edgeXs.at(i);
-		int y = edgeYs.at(i);
-		if (dis(x, y, aX, aY) < 1.5 * aD) {
-			noiseCancelledEdgeXs.push_back(x);
-			noiseCancelledEdgeYs.push_back(y);
-		}
-	}
-
-	double diameter = 0;
-	int x1, y1, x2, y2, x3, y3, x4, y4, x5, y5;
-	findLongest(noiseCancelledEdgeXs, noiseCancelledEdgeYs, x1, y1, x2, y2);
-	int tempCenX = (x1 + x2) / 2;
-	int tempCenY = (y1 + y2) / 2;
-	findLongest(tempCenX, tempCenY, noiseCancelledEdgeXs, noiseCancelledEdgeYs, x3, y3);
-	int invX = tempCenX * 2 - x3;
-	int invY = tempCenY * 2 - y3;
-	findShortest(invX, invY, noiseCancelledEdgeXs, noiseCancelledEdgeYs, x4, y4);
-	cenX = (x3 + x4) / 2;
-	cenY = (y3 + y4) / 2;
-	findLongest(cenX, cenY, noiseCancelledEdgeXs, noiseCancelledEdgeYs, x5, y5);
-	diameter = 2.0 * sqrt(dis(x5, y5, cenX, cenY));
-
-	xs.push_back(cenX);
-	ys.push_back(cenY);
-	ds.push_back(diameter);
-}
-
-void findBall() {
-
-	vector<int> xs = {};
-	vector<int> ys = {};
-	vector<double> ds = {};
-
-	clock_t start;
-	double duration = 0.0;
-	start = clock();
-
-	uchar hvs[1920][1080][2];
-
-	string line;
-	ifstream myfile("C:\\General use\\Homework\\CS 4710\\data\\log.txt");
-	int c = 0;
-	int lk, k, j;
-	if (myfile.is_open())
-	{
-		for (int i; getline(myfile, line); i++)
-		{
-
-			j = i % (1920 * 1080 * 2);
-			k = i / (1920 * 1080 * 2);
-
-			if (lk != k) {
-				findBall(hvs, xs, ys, ds);
-				duration = ((clock() - start) / (double)CLOCKS_PER_SEC);
-			}
-			
-			uchar horv = atof(line.c_str());
-			hvs[j%(1920*2) / 2 * 2][j/(1920*2)][j%2] = horv;
-
-			lk = k;
-		}
-
-		myfile.close();
-	}
-
-
-	cancelNoise(xs, ys, ds);
-
-	cout << "Noise cancel clear" << endl << endl;
-
-	vector<double> Xs = {};
-	vector<double> Ys = {};
-	vector<double> Zs = {};
-
-	xydToXYZ(xs, ys, ds, Xs, Ys, Zs);
-
-	cout << "coordinate cancel clear" << endl << endl;
-
-	ofstream f;
-	f.open("C:\\General use\\Homework\\CS 4710\\data\\func.txt");
-
-	cout << "here" << endl;
-
-	curveFit(Xs, Ys, Zs, f);
-
-	cout << "curvefit cancel clear" << endl << endl;
-
-	vector<double> speeds = {};
-	getSpeed(Xs, Ys, Zs, speeds);
-
-	cout << "speed cancel clear" << endl << endl;
-
-	double as = 0;
-	for (int i = 0; i < speeds.size(); i++) {
-		as += speeds.at(i);
-	}
-
-	f << (double)Xs.size() * 1 / 30 << endl;
-	as /= speeds.size();
-	f << as << endl;
-
-	duration = ((clock() - start) / (double)CLOCKS_PER_SEC);
-	cout << duration << endl << endl;
-
-	f.close();
-}
 
 Mat seeNoise(Mat frame) {
 	Mat hsv;
@@ -335,31 +95,33 @@ int main()
 			if (c == 27) break;
 		}
 	}
-	
+
 	//if (!recording)
-		//findBall(frames);
+	//findBall(frames);
 	clock_t start;
 	double duration;
 	start = clock();
 
 	cutMats(fs);
 
-	cout << fs.size()<< endl;
+	cout << "This video has " << fs.size() << " frames" << endl;
 
 	duration = (clock() - start) / (double)CLOCKS_PER_SEC;
-	cout << duration << endl;
+	cout << "It takes " << duration << " seconds to do the first cut" << endl << endl;
 
 	for (int i = 0; i < fs.size(); i++) {
 		Mat newframe = seeNoise(fs[i]);
 		video << newframe;
 	}
-	
+
 	video.release();
 
 	findBall(fs);
 
 	vcap.release();
 
+	int wait;
+	cin >> wait;
 
 	return 0;
 }
@@ -377,8 +139,8 @@ void findBall(vector<Mat> & frames) {
 	for (int i = 0; i < frames.size(); i++) {
 		findBall(frames[i], xs, ys, ds);
 		duration = ((clock() - start) / (double)CLOCKS_PER_SEC);
-		cout << i << endl;
-		cout << duration << endl << endl;
+		cout << "Prosessing frame "<< i << endl;
+		cout << "it takes " << duration << " s" << endl << endl;
 	}
 
 	cancelNoise(xs, ys, ds);
@@ -391,21 +153,19 @@ void findBall(vector<Mat> & frames) {
 
 	xydToXYZ(xs, ys, ds, Xs, Ys, Zs);
 
-	cout << "coordinate cancel clear" << endl << endl;
+	cout << "Coordinate cancel clear" << endl << endl;
 
 	ofstream f;
 	f.open("C:\\General use\\Homework\\CS 4710\\data\\func.txt");
 
-	cout << "here" << endl;
-
 	curveFit(Xs, Ys, Zs, f);
 
-	cout << "curvefit cancel clear" << endl << endl;
+	cout << "Curvefit cancel clear" << endl << endl;
 
 	vector<double> speeds = {};
 	getSpeed(Xs, Ys, Zs, speeds);
 
-	cout << "speed cancel clear" << endl << endl;
+	cout << "speed clear" << endl << endl;
 
 	double as = 0;
 	for (int i = 0; i < speeds.size(); i++) {
@@ -417,7 +177,7 @@ void findBall(vector<Mat> & frames) {
 	f << as << endl;
 
 	duration = ((clock() - start) / (double)CLOCKS_PER_SEC);
-	cout << duration << endl << endl;
+	cout << "Total time would be " << duration << " seconds"<< endl << endl;
 
 	f.close();
 }
@@ -436,9 +196,6 @@ void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds
 	int cenX = 0;
 	int cenY = 0;
 
-	ofstream log;
-	log.open("C:\\General use\\Homework\\CS 4710\\data\\log.txt");
-
 	for (int x = 0; x < input.cols; x++) {
 
 		bool startFlag = false;
@@ -446,12 +203,10 @@ void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds
 		int ballCount = 0;
 		int endCount = 0;
 
-		
+
 		for (int y = 0; y < input.rows; y++) {
 
 			Vec3b pixel = hsv.at<Vec3b>(y, x);
-			log << pixel.val[0] << endl; // debug
-			log << pixel.val[1] << endl; // debug
 
 			if (!startFlag) {
 				if (findBall(pixel)) {
@@ -678,14 +433,11 @@ void curveFit(vector <double> & Xs, vector <double> & Ys, vector <double> & Zs, 
 
 	// sum up
 
-
-	cout << "or here" << endl;
-
 	double offset = addOffset(Zs[0], 1.0 / 30, Zs[1], 2.0 / 30);
-	offset = offset < -1/30 ? 0 : offset;
+	offset = offset < -1 / 30 ? 0 : offset;
 
 
-	cout << offset << endl;
+	cout << "Offset is "<<offset << endl << endl;
 
 	for (double i = 0; i < n; i++) {
 
@@ -695,8 +447,6 @@ void curveFit(vector <double> & Xs, vector <double> & Ys, vector <double> & Zs, 
 		double x = Xs.at(i);
 		double y = Ys.at(i);
 		double z = Zs.at(i);
-
-		cout << i << ": " << z << endl;
 
 		st += t;
 		st2 += t*t;
@@ -746,11 +496,10 @@ void curveFit(vector <double> & Xs, vector <double> & Ys, vector <double> & Zs, 
 	double ya = ay - yb * at;
 
 	// z part
-	cout << "slnt: " << slnt << endl;
+	cout << "Slnt is " << slnt << endl;
 	double zb = (n * szlnt - sz * slnt) / (n * slnt2 - slnt * slnt);
-	cout << "zb: " << zb << endl;
-	int kk;
-	cin >> kk;
+	cout << "Zb is " << zb << endl << endl;
+
 	double za = (sz - zb * slnt) / n;
 
 	// curve fitting
@@ -799,6 +548,8 @@ void threeUnknownLinear(double constants[3][4], double & x, double & y, double &
 }
 
 double addOffset(double z1, double t1, double z2, double t2) {
+	cout << "z2 - z1 is " << z2 - z1 << endl;
+	cout << "t2 - t1 is " << t2 - t1 << endl << endl;
 	double k = (z2 - z1) / (t2 - t1);
 	double c = z1 - k * t1;
 	return c / k;
