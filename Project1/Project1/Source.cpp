@@ -117,12 +117,12 @@ int main()
 	duration = (clock() - start) / (double)CLOCKS_PER_SEC;
 	cout << "It takes " << duration << " seconds to do the first cut" << endl << endl;
 
-	for (int i = 0; i < fs.size(); i++) {
-		Mat newframe = seeNoise(fs[i]);
-		string name = "C:\\General use\\Homework\\CS 4710\\data\\" + to_string(i) + ".png";
-		imwrite(name, newframe);
-		//video << newframe;
-	}
+	//for (int i = 0; i < fs.size(); i++) {
+	//	Mat newframe = seeNoise(fs[i]);
+	//	string name = "C:\\General use\\Homework\\CS 4710\\data\\" + to_string(i) + ".png";
+	//	imwrite(name, newframe);
+	//	//video << newframe;
+	//}
 
 	//video.release();
 
@@ -191,7 +191,7 @@ void findBallVid(vector<Mat> & frames) {
 
 	xydToXYZ(xs, ys, ds, Xs, Ys, Zs);
 
-	cout << "Coordinate cancel clear" << endl << endl;
+	cout << "Coordinate clear" << endl << endl;
 
 	ofstream f;
 	f.open("C:\\General use\\Homework\\CS 4710\\data\\func.txt");
@@ -203,7 +203,7 @@ void findBallVid(vector<Mat> & frames) {
 	vector<double> speeds = {};
 	getSpeed(Xs, Ys, Zs, speeds);
 
-	cout << "speed clear" << endl << endl;
+	cout << "Speed clear" << endl << endl;
 
 	double as = 0;
 	for (int i = 0; i < speeds.size(); i++) {
@@ -553,9 +553,9 @@ void curveFit(vector <double> & Xs, vector <double> & Ys, vector <double> & Zs, 
 	double ya = ay - yb * at;
 
 	// z part
-	cout << "Slnt is " << slnt << endl;
+	cout << "slnt is " << slnt << endl;
 	double zb = (n * szlnt - sz * slnt) / (n * slnt2 - slnt * slnt);
-	cout << "Zb is " << zb << endl << endl;
+	cout << "zb is " << zb << endl << endl;
 
 	double za = (sz - zb * slnt) / n;
 
@@ -637,21 +637,32 @@ void cancelNoise(vector<int> & xs, vector<int> & ys, vector<double> & ds) {
 		thisS++;
 	}
 
+	theS++;
+	theE++;
+	thisS++;
+
+	// debugging
+	for (int i = 0; i < n ; i++) {
+		cout << "(x[" << i << "], y[" << i << "]) is (" << xs[i] << ", " << ys[i] << ")" << endl;
+	}
+
 	for (int i = theS + 1; i < n; i++) {
-
-		cout << "x[" << i << "] is " << xs[i] << endl;
-
 
 		if (xs.at(theE) - xs.at(theS) < xs.at(i) - xs.at(thisS)) {
 			theS = thisS;
 			theE = i;
 		}
-	}
 
+
+		if (ys.at(i) > ys.at(i - 1)) {
+			theE--;
+			break;
+		}
+	}
 
 	cout << "The second cut starts from index " << theS + xs.size() - n << " to " << theE << endl << endl;
 
-	if (theE != 0) {
+	if (theE != theS) {
 
 		xs.erase(xs.begin() + theE, xs.end());
 		ys.erase(ys.begin() + theE, ys.end());
