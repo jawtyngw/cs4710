@@ -14,10 +14,10 @@
 using namespace cv;
 using namespace std;
 
-void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds);
-bool findBall(Vec3b pixel);
-void findBall(vector<Mat> & fs);
-bool findBall(uchar h, uchar v);
+DWORD WINAPI findBallMat(void* parammeter);
+bool findBallPx(Vec3b pixel);
+void findBallVid(vector<Mat> & fs);
+bool findBallVal(uchar h, uchar v);
 
 void cutMats(vector<Mat> & fs);
 int mostPixel(vector<Mat> & fs);
@@ -34,8 +34,16 @@ void findLongest(vector<int> & xs, vector<int> & ys, int & x1, int & y1, int & x
 void findShortest(int x, int y, vector<int> & xs, vector<int> & ys, int & x2, int & y2);
 void findLongest(int x, int y, vector<int> & xs, vector<int> & ys, int & x2, int & y2);
 int dis(int x1, int y1, int x2, int y2);
-
 bool recording = false;
+
+struct FindBallParams
+{
+	Mat frame;
+	int index;
+	int* xs;
+	int* ys;
+	double* ds;
+};
 
 
 Mat seeNoise(Mat frame) {
@@ -46,7 +54,7 @@ Mat seeNoise(Mat frame) {
 	for (int y = 0; y < frame.rows; y++) {
 		for (int x = 0; x < frame.cols; x++) {
 			Vec3b pixel = hsv.at<Vec3b>(y, x);
-			if (findBall(pixel)) {
+			if (findBallPx(pixel)) {
 				copy.at<Vec3b>(y, x).val[0] = 255;
 				copy.at<Vec3b>(y, x).val[1] = 255;
 				copy.at<Vec3b>(y, x).val[2] = 0;
@@ -76,7 +84,7 @@ int main()
 	int frame_width = vcap.get(CV_CAP_PROP_FRAME_WIDTH);
 	int frame_height = vcap.get(CV_CAP_PROP_FRAME_HEIGHT);
 
-	VideoWriter video("C:\\General use\\Homework\\CS 4710\\data\\out.avi", CV_FOURCC('m', 'p', '4', 'v'), 30, Size(frame_width, frame_height), true);
+	//VideoWriter video("C:\\General use\\Homework\\CS 4710\\data\\out.avi", CV_FOURCC('m', 'p', '4', 'v'), 30, Size(frame_width, frame_height), true);
 
 	const int count = 150;
 	vector<Mat> fs;
@@ -90,7 +98,7 @@ int main()
 
 		if (recording)
 		{
-			video << frame;
+			//video << frame;
 			char c = (char)waitKey(33);
 			if (c == 27) break;
 		}
@@ -111,12 +119,14 @@ int main()
 
 	for (int i = 0; i < fs.size(); i++) {
 		Mat newframe = seeNoise(fs[i]);
-		video << newframe;
+		string name = "C:\\General use\\Homework\\CS 4710\\data\\" + to_string(i) + ".png";
+		imwrite(name, newframe);
+		//video << newframe;
 	}
 
-	video.release();
+	//video.release();
 
-	findBall(fs);
+	findBallVid(fs);
 
 	vcap.release();
 
@@ -126,22 +136,50 @@ int main()
 	return 0;
 }
 
-void findBall(vector<Mat> & frames) {
+void findBallVid(vector<Mat> & frames) {
 
-	vector<int> xs = {};
-	vector<int> ys = {};
-	vector<double> ds = {};
 
 	clock_t start;
-	double duration = 0.0;
+	double duration;
 	start = clock();
 
-	for (int i = 0; i < frames.size(); i++) {
-		findBall(frames[i], xs, ys, ds);
-		duration = ((clock() - start) / (double)CLOCKS_PER_SEC);
-		cout << "Prosessing frame "<< i << endl;
-		cout << "it takes " << duration << " s" << endl << endl;
+	int size = frames.size();
+	HANDLE* threadHandles = new HANDLE[size];
+	int* xa = new int[size];
+	int* ya = new int[size];
+	double* da = new double[size];
+	FindBallParams* params = new FindBallParams[size];
+
+	for (int i = 0; i < size; i++) {
+		params[i].frame = frames[i];
+		params[i].index = i;
+		params[i].xs = xa;
+		params[i].ys = ya;
+		params[i].ds = da;
+		threadHandles[i] = CreateThread(NULL, 0, findBallMat, &params[i], 0, NULL);
+		//findBall(frames[i], xs, ys, ds);
+		//duration = ((clock() - start) / (double)CLOCKS_PER_SEC);
+		//cout << "Prosessing frame "<< i << endl;
+		//cout << "it takes " << duration << " s" << endl << endl;
 	}
+	WaitForMultipleObjects(size, threadHandles, true, INFINITE);
+	delete[] params;
+	delete[] threadHandles;
+
+	duration = (clock() - start) / (double)CLOCKS_PER_SEC;
+	cout << endl << "It takes " << duration << " seconds to process all the frames" << endl;
+	cout << "Multithreading Clear" << endl << endl;
+
+	start = clock();
+
+	vector<int> xs(xa, xa + size);
+	vector<int> ys(ya, ya + size);
+	vector<double> ds(da, da + size);
+
+	/*for (int i = 0; i < size; i++)
+	{
+		cout << "i: " << i << " x: " << xs[i] << " y: " << ys[i] << " d: " << ds[i] << endl;
+	}*/
 
 	cancelNoise(xs, ys, ds);
 
@@ -177,12 +215,20 @@ void findBall(vector<Mat> & frames) {
 	f << as << endl;
 
 	duration = ((clock() - start) / (double)CLOCKS_PER_SEC);
-	cout << "Total time would be " << duration << " seconds"<< endl << endl;
+	cout << "The rest would cost " << duration << " seconds"<< endl << endl;
 
 	f.close();
 }
 
-void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds) {
+DWORD WINAPI findBallMat(void* parammeter) {
+	FindBallParams* params = (FindBallParams*) parammeter;
+	Mat input = params->frame;
+	int index = params->index;
+	int* xs = params->xs;
+	int* ys = params->ys;
+	double* ds = params->ds;
+
+	//printf("Processing frame %d, xs: %p, ys: %p, ds: %p\n", index, xs, ys, ds);
 
 	Mat hsv;
 	cvtColor(input, hsv, CV_BGR2HSV);
@@ -209,7 +255,7 @@ void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds
 			Vec3b pixel = hsv.at<Vec3b>(y, x);
 
 			if (!startFlag) {
-				if (findBall(pixel)) {
+				if (findBallPx(pixel)) {
 					ballCount++;
 				}
 				else {
@@ -217,7 +263,7 @@ void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds
 				}
 			}
 			else if (!endFlag) {
-				if (!findBall(pixel)) {
+				if (!findBallPx(pixel)) {
 					endCount++;
 				}
 				else {
@@ -258,7 +304,7 @@ void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds
 			Vec3b pixel = hsv.at<Vec3b>(y, x);
 
 			if (!startFlag) {
-				if (findBall(pixel)) {
+				if (findBallPx(pixel)) {
 					ballCount++;
 				}
 				else {
@@ -266,7 +312,7 @@ void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds
 				}
 			}
 			else if (!endFlag) {
-				if (!findBall(pixel)) {
+				if (!findBallPx(pixel)) {
 					endCount++;
 				}
 				else {
@@ -340,16 +386,20 @@ void findBall(Mat input, vector<int> & xs, vector<int> & ys, vector<double> & ds
 	findLongest(cenX, cenY, noiseCancelledEdgeXs, noiseCancelledEdgeYs, x5, y5);
 	diameter = 2.0 * sqrt(dis(x5, y5, cenX, cenY));
 
-	xs.push_back(cenX);
-	ys.push_back(cenY);
-	ds.push_back(diameter);
+	xs[index] = cenX;
+	ys[index] = cenY;
+	ds[index] = diameter;
+
+	printf("Frame %d is processed. X: %d, Y: %d, diameter: %f\n", index, cenX, cenY, diameter);
+
+	return 0;
 }
 
-bool findBall(Vec3b pixel) {
+bool findBallPx(Vec3b pixel) {
 	return (pixel.val[0] > 167 || pixel.val[0] < 6) && pixel.val[1] > 90;
 }
 
-bool findBall(uchar h, uchar v) {
+bool findBallVal(uchar h, uchar v) {
 	return (h > 167 || h < 6) && v > 90;
 }
 
@@ -369,6 +419,7 @@ void cutMats(vector<Mat> & fs) {
 		fs.erase(fs.begin() + arround + 20, fs.end());
 		fs.erase(fs.begin(), fs.begin() + arround - 10);
 	}
+
 }
 
 int mostPixel(vector<Mat> & fs) {
@@ -401,7 +452,7 @@ int countPixel(Mat f) {
 			h = *pixel++;
 			v = *pixel++;
 			pixel++;
-			if (findBall(h, v)) {
+			if (findBallVal(h, v)) {
 				count++;
 			}
 		}
@@ -448,6 +499,10 @@ void curveFit(vector <double> & Xs, vector <double> & Ys, vector <double> & Zs, 
 		double y = Ys.at(i);
 		double z = Zs.at(i);
 
+		cout << "x[" << i << "] is " << x << endl;
+		cout << "y[" << i << "] is " << y << endl;
+		cout << "z[" << i << "] is " << z << endl;
+
 		st += t;
 		st2 += t*t;
 		st3 += t*t*t;
@@ -465,6 +520,8 @@ void curveFit(vector <double> & Xs, vector <double> & Ys, vector <double> & Zs, 
 		szlnt += z * lnt;
 		slnt2 += lnt * lnt;
 	}
+
+	cout << endl;
 
 	// x part
 
@@ -574,20 +631,27 @@ void cancelNoise(vector<int> & xs, vector<int> & ys, vector<double> & ds) {
 	int theE = 0; // end
 	int thisS = 0;
 
-	for (int i = 1; i < n; i++) {
+	while (xs[theS] < 0) {
+		theS++;
+		theE++;
+		thisS++;
+	}
 
-		if (xs.at(i) < xs.at(i - 1)) {
+	for (int i = theS + 1; i < n; i++) {
 
-			if (xs.at(theE) - xs.at(theS) < xs.at(i) - xs.at(thisS)) {
-				theS = thisS;
-				theE = i;
-			}
+		cout << "x[" << i << "] is " << xs[i] << endl;
 
-			thisS = i;
+
+		if (xs.at(theE) - xs.at(theS) < xs.at(i) - xs.at(thisS)) {
+			theS = thisS;
+			theE = i;
 		}
 	}
 
-	if ((theS | theE | thisS) != 0) {
+
+	cout << "The second cut starts from index " << theS + xs.size() - n << " to " << theE << endl << endl;
+
+	if (theE != 0) {
 
 		xs.erase(xs.begin() + theE, xs.end());
 		ys.erase(ys.begin() + theE, ys.end());
